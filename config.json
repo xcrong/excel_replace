@@ -1,7 +1,7 @@
 {
-    "columns": "A",
+    "columns": "",
     "rows": "",
-    "clean_char": "（ 免费）",
+    "target_char": "（统编）",
     "select_folder": true,
     "overwrite": true,
     "file_path": "",

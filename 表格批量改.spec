@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['src\\batch_modify_excel\\__main__.py'],
+    ['src\\batch_modify_excel\\__main__.pyw'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -21,12 +21,12 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='__main__',
+    name='表格批量改',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -40,5 +40,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='__main__',
+    name='表格批量改',
 )

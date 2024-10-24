@@ -35,8 +35,6 @@ pywin32-ctypes==0.2.3
 setuptools==75.2.0
     # via pyinstaller
     # via pyinstaller-hooks-contrib
-tkintermodernthemes==1.10.2
-    # via batch-modify-excel
 ttkbootstrap==1.10.1
     # via batch-modify-excel
 zipp==3.20.2
