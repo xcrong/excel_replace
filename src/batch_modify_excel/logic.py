@@ -42,8 +42,9 @@ class ExcelReplicerLogic:
         except Exception as e:
             logger.info(Config.CONFIG_SAVE_ERROR.format(str(e)))
 
-    def parse_input(self, input_str, is_row=False):
+    def parse_input(self, input_str: str, is_row=False):
         """将输入字符串解析为列表"""
+        input_str = input_str.strip()
         if not input_str:
             return None
 
