@@ -44,9 +44,7 @@ class Config:
     # 已选择文件消息
     FILE_SELECTED_MESSAGE = "已选择文件: {}"
     # 处理完成消息
-    PROCESS_COMPLETE_MESSAGE = (
-        "文件夹内所有Excel文件处理完毕！"
-    )
+    PROCESS_COMPLETE_MESSAGE = "文件夹内所有Excel文件处理完毕！"
     # 单个文件处理完成消息
     SINGLE_FILE_COMPLETE_MESSAGE = "文件处理完毕！"
     # 警告消息

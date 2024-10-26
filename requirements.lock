@@ -12,30 +12,102 @@
 -e file:.
 altgraph==0.17.4
     # via pyinstaller
+asttokens==2.4.1
+    # via stack-data
+backcall==0.2.0
+    # via ipython
+colorama==0.4.6
+    # via ipython
+comm==0.2.2
+    # via ipykernel
+debugpy==1.8.7
+    # via ipykernel
+decorator==5.1.1
+    # via ipython
 et-xmlfile==1.1.0
     # via openpyxl
+executing==2.1.0
+    # via stack-data
 importlib-metadata==8.5.0
+    # via jupyter-client
     # via pyinstaller
     # via pyinstaller-hooks-contrib
+ipykernel==6.29.5
+    # via batch-modify-excel
+ipython==8.12.3
+    # via ipykernel
+jedi==0.19.1
+    # via ipython
+jupyter-client==8.6.3
+    # via ipykernel
+jupyter-core==5.7.2
+    # via ipykernel
+    # via jupyter-client
+matplotlib-inline==0.1.7
+    # via ipykernel
+    # via ipython
+nest-asyncio==1.6.0
+    # via ipykernel
 openpyxl==3.1.5
     # via batch-modify-excel
 packaging==24.1
+    # via ipykernel
     # via pyinstaller
     # via pyinstaller-hooks-contrib
+parso==0.8.4
+    # via jedi
 pefile==2023.2.7
     # via pyinstaller
+pickleshare==0.7.5
+    # via ipython
 pillow==10.4.0
     # via ttkbootstrap
+platformdirs==4.3.6
+    # via jupyter-core
+prompt-toolkit==3.0.48
+    # via ipython
+psutil==6.1.0
+    # via ipykernel
+pure-eval==0.2.3
+    # via stack-data
+pygments==2.18.0
+    # via ipython
 pyinstaller==6.11.0
     # via batch-modify-excel
 pyinstaller-hooks-contrib==2024.9
     # via pyinstaller
+python-dateutil==2.9.0.post0
+    # via jupyter-client
+pywin32==308
+    # via jupyter-core
 pywin32-ctypes==0.2.3
     # via pyinstaller
+pyzmq==26.2.0
+    # via ipykernel
+    # via jupyter-client
 setuptools==75.2.0
     # via pyinstaller
     # via pyinstaller-hooks-contrib
+six==1.16.0
+    # via asttokens
+    # via python-dateutil
+stack-data==0.6.3
+    # via ipython
+tornado==6.4.1
+    # via ipykernel
+    # via jupyter-client
+traitlets==5.14.3
+    # via comm
+    # via ipykernel
+    # via ipython
+    # via jupyter-client
+    # via jupyter-core
+    # via matplotlib-inline
 ttkbootstrap==1.10.1
     # via batch-modify-excel
+typing-extensions==4.12.2
+    # via ipython
+wcwidth==0.2.13
+    # via prompt-toolkit
 zipp==3.20.2
     # via importlib-metadata

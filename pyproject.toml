@@ -7,6 +7,7 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pyinstaller>=6.11.0",
     "ttkbootstrap>=1.10.1",
+    "ipykernel>=6.29.5",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"

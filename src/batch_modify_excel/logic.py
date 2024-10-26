@@ -1,154 +1,198 @@
-# logic.py
-import os  # 导入os模块，用于文件路径操作
-import json  # 导入json模块，用于处理配置文件
-import threading  # 导入threading模块，用于多线程处理
-from tkinter import (
-    messagebox,
-)  # 从tkinter导入messagebox模块，用于显示消息框
-from openpyxl import (
-    load_workbook,
-)  # 从openpyxl导入load_workbook函数，用于加载Excel文件
-from batch_modify_excel.config import (
-    Config,
-)  # 从配置文件中导入Config类
+import os
+import json
+import threading
+from tkinter import messagebox
+from openpyxl import load_workbook
+from openpyxl.utils import (
+    get_column_letter,
+    column_index_from_string,
+)
+from batch_modify_excel.config import Config
+from multiprocessing import Pool, cpu_count
 
 
 class ExcelReplicerLogic:
     def __init__(self):
-        self.config_file = (
-            Config.CONFIG_FILE
-        )  # 设置配置文件路径
-        self.config = self.load_config()  # 加载配置文件
-        self.processing = False  # 初始化处理标志为False
-        self.current_thread = None  # 初始化当前线程为None
+        self.config_file = Config.CONFIG_FILE
+        self.config = self.load_config()
+        self.processing = False
+        self.current_thread = None
+        self.process_pool_size = max(1, cpu_count() - 1)
 
     def load_config(self):
         """从文件中加载配置"""
-        if os.path.exists(
-            self.config_file
-        ):  # 检查配置文件是否存在
+        if os.path.exists(self.config_file):
             with open(
                 self.config_file, "r", encoding="utf-8"
-            ) as f:  # 打开配置文件
-                return json.load(f)  # 返回配置文件的内容
-        return {}  # 如果配置文件不存在，返回空字典
+            ) as f:
+                return json.load(f)
+        return {}
 
     def save_config(self, values):
         """将配置保存到文件中"""
         try:
-            self.config.update(values)  # 更新配置字典
+            self.config.update(values)
             with open(
                 self.config_file, "w", encoding="utf-8"
-            ) as f:  # 打开配置文件
+            ) as f:
                 json.dump(
                     self.config,
                     f,
                     ensure_ascii=False,
                     indent=4,
-                )  # 将配置保存到文件中
+                )
         except Exception as e:
-            print(
-                Config.CONFIG_SAVE_ERROR.format(str(e))
-            )  # 如果保存配置时出错，打印错误信息
+            print(Config.CONFIG_SAVE_ERROR.format(str(e)))
 
     def parse_input(self, input_str, is_row=False):
         """将输入字符串解析为列表"""
-        if not input_str:  # 如果输入字符串为空
-            return None  # 返回None
+        if not input_str:
+            return None
 
-        for sep in Config.SEPARATORS:  # 遍历分隔符列表
-            if (
-                sep in input_str
-            ):  # 如果输入字符串中包含分隔符
+        for sep in Config.SEPARATORS:
+            if sep in input_str:
                 items = [
                     item.strip()
                     for item in input_str.split(sep)
-                ]  # 将输入字符串按分隔符分割，并去除空格
-                if is_row:  # 如果是解析行号
+                ]
+                if is_row:
                     try:
-                        return [
-                            int(item) for item in items
-                        ]  # 尝试将每个项转换为整数
+                        return [int(item) for item in items]
                     except ValueError:
                         messagebox.showerror(
                             Config.INPUT_ERROR_MESSAGE,
                             Config.ROW_NUMBER_ERROR,
-                        )  # 如果转换失败，显示错误信息
+                        )
                         return None
-                return items  # 返回解析后的列表
-        return [
-            input_str.strip()
-        ]  # 如果输入字符串中不包含分隔符，返回包含输入字符串的列表
+                return items
+        return [input_str.strip()]
 
-    def replace_target_char(
-        self,
-        file_path,
-        columns,
-        rows,
-        target_char,
-        replace_char,
-        overwrite,
-    ):
-        """根据指定的参数处理Excel文件"""
+    @staticmethod
+    def validate_column(col):
+        """验证并转换列标识"""
         try:
-            wb = load_workbook(file_path)  # 加载Excel文件
+            # 如果是数字，转换为字母
+            if col.isdigit():
+                return get_column_letter(int(col))
+            # 确保列标识是有效的
+            column_index_from_string(col.upper())
+            return col.upper()
+        except ValueError:
+            return None
 
-            for sheet in wb.worksheets:  # 遍历工作表
-                if columns:  # 如果指定了列
-                    for col in columns:  # 遍历列
-                        for cell in sheet[
-                            col
-                        ]:  # 遍历列中的每个单元格
-                            if (
-                                cell.value
-                                and target_char
-                                in str(cell.value)
-                            ):  # 如果单元格值包含要处理的字符
-                                cell.value = str(
-                                    cell.value
-                                ).replace(
-                                    target_char,
-                                    replace_char,
-                                )  # 处理单元格值
+    @staticmethod
+    def process_cell_value(
+        cell_value, target_char, replace_char
+    ):
+        """处理单元格值"""
+        if cell_value is None:
+            return None
+        return str(cell_value).replace(
+            target_char, replace_char
+        )
 
-                if rows:  # 如果指定了行
-                    for row_num in rows:  # 遍历行号
-                        for cell in sheet[
-                            row_num
-                        ]:  # 遍历行中的每个单元格
-                            if (
-                                cell.value
-                                and target_char
-                                in str(cell.value)
-                            ):  # 如果单元格值包含要处理的字符
-                                cell.value = str(
-                                    cell.value
-                                ).replace(
-                                    target_char,
-                                    replace_char,
-                                )  # 处理单元格值
+    @staticmethod
+    def process_sheet(
+        sheet, columns, rows, target_char, replace_char
+    ):
+        """处理单个工作表"""
+        # 获取该工作表的实际维度
+        max_row = sheet.max_row
+        max_column = sheet.max_column
 
-                if (
-                    not columns and not rows
-                ):  # 如果既没有指定列也没有指定行
-                    for row in (
-                        sheet.iter_rows()
-                    ):  # 遍历工作表中的每一行
-                        for (
-                            cell
-                        ) in row:  # 遍历行中的每个单元格
-                            if (
-                                cell.value
-                                and target_char
-                                in str(cell.value)
-                            ):  # 如果单元格值包含要处理的字符
-                                cell.value = str(
-                                    cell.value
-                                ).replace(
-                                    target_char,
-                                    replace_char,
-                                )  # 处理单元格值
+        # 处理指定列
+        if columns:
+            valid_columns = []
+            for col in columns:
+                valid_col = (
+                    ExcelReplicerLogic.validate_column(col)
+                )
+                if valid_col:
+                    col_idx = column_index_from_string(
+                        valid_col
+                    )
+                    if (
+                        col_idx <= max_column
+                    ):  # 确保列在工作表范围内
+                        valid_columns.append(valid_col)
 
+            for col in valid_columns:
+                for row in range(1, max_row + 1):
+                    cell = sheet[f"{col}{row}"]
+                    if cell.value and target_char in str(
+                        cell.value
+                    ):
+                        cell.value = ExcelReplicerLogic.process_cell_value(
+                            cell.value,
+                            target_char,
+                            replace_char,
+                        )
+
+        # 处理指定行
+        if rows:
+            valid_rows = [
+                r for r in rows if 1 <= r <= max_row
+            ]
+            for row in valid_rows:
+                for col_idx in range(1, max_column + 1):
+                    col_letter = get_column_letter(col_idx)
+                    cell = sheet[f"{col_letter}{row}"]
+                    if cell.value and target_char in str(
+                        cell.value
+                    ):
+                        cell.value = ExcelReplicerLogic.process_cell_value(
+                            cell.value,
+                            target_char,
+                            replace_char,
+                        )
+
+        # 如果没有指定行和列，处理所有单元格
+        if not columns and not rows:
+            for row in range(1, max_row + 1):
+                for col_idx in range(1, max_column + 1):
+                    col_letter = get_column_letter(col_idx)
+                    cell = sheet[f"{col_letter}{row}"]
+                    if cell.value and target_char in str(
+                        cell.value
+                    ):
+                        cell.value = ExcelReplicerLogic.process_cell_value(
+                            cell.value,
+                            target_char,
+                            replace_char,
+                        )
+
+    @staticmethod
+    def replace_target_char_worker(args):
+        """
+        工作进程的处理函数
+        返回元组 (是否成功, 文件路径)
+        """
+        (
+            file_path,
+            columns,
+            rows,
+            target_char,
+            replace_char,
+            overwrite,
+        ) = args
+        try:
+            wb = load_workbook(filename=file_path)
+
+            # 遍历每个工作表
+            for sheet_name in wb.sheetnames:
+                sheet = wb[sheet_name]
+                print(f"处理工作表: {sheet_name}")
+
+                # 处理当前工作表
+                ExcelReplicerLogic.process_sheet(
+                    sheet,
+                    columns,
+                    rows,
+                    target_char,
+                    replace_char,
+                )
+
+            # 保存文件
             save_path = (
                 file_path
                 if overwrite
@@ -156,135 +200,124 @@ class ExcelReplicerLogic:
                     os.path.dirname(file_path),
                     "new_" + os.path.basename(file_path),
                 )
-            )  # 根据是否覆盖原文件决定保存路径
+            )
 
-            wb.save(save_path)  # 保存Excel文件
+            wb.save(save_path)
+            wb.close()  # 确保关闭工作簿
             print(
                 Config.FILE_SAVED_MESSAGE.format(save_path)
-            )  # 打印文件保存的消息
-            return True  # 返回成功标志
+            )
+            return True, file_path
         except Exception as e:
-            print(
-                f"处理文件 {file_path} 时出错: {str(e)}"
-            )  # 如果处理文件时出错，打印错误信息
-            return False  # 返回失败标志
+            print(f"处理文件 {file_path} 时出错: {str(e)}")
+            return False, file_path
 
     def process_files(
         self, values, progress_callback, complete_callback
     ):
-        """在后台线程中处理文件"""
-        file_path = values["last_file_path"]  # 获取文件路径
-        columns = self.parse_input(
-            values["columns"]
-        )  # 解析列输入
-        rows = self.parse_input(
-            values["rows"], is_row=True
-        )  # 解析行输入
-        target_char = values[
-            "target_char"
-        ]  # 获取要处理的字符
-        replace_char = values[
-            "replace_char"
-        ]  # 获取要替换的字符
-        overwrite = values[
-            "overwrite"
-        ]  # 获取是否覆盖原文件
+        """使用进程池处理文件"""
+        file_path = values["last_file_path"]
+        columns = self.parse_input(values["columns"])
+        rows = self.parse_input(values["rows"], is_row=True)
+        target_char = values["target_char"]
+        replace_char = values["replace_char"]
+        overwrite = values["overwrite"]
 
         try:
-            if values["select_folder"]:  # 如果选择了文件夹
-                total_files = sum(
-                    1
-                    for _, _, files in os.walk(file_path)
-                    for file in files
-                    if file.endswith(".xlsx")
-                )  # 计算文件夹中所有Excel文件的数量
-                processed_files = (
-                    0  # 初始化已处理文件的数量
-                )
-                success_count = (
-                    0  # 初始化成功处理的文件数量
-                )
+            if values["select_folder"]:
+                # 收集所有需要处理的文件
+                excel_files = []
+                for root, _, files in os.walk(file_path):
+                    excel_files.extend(
+                        [
+                            os.path.join(root, f)
+                            for f in files
+                            if f.endswith(".xlsx")
+                        ]
+                    )
 
-                for root, dirs, files in os.walk(
-                    file_path
-                ):  # 遍历文件夹
-                    if (
-                        not self.processing
-                    ):  # 检查是否应继续处理
-                        break
+                total_files = len(excel_files)
+                if total_files == 0:
+                    complete_callback(0, 0)
+                    return
 
-                    for file in files:  # 遍历文件
-                        if (
-                            not self.processing
-                        ):  # 检查是否应继续处理
+                # 准备进程池的参数
+                process_args = [
+                    (
+                        f,
+                        columns,
+                        rows,
+                        target_char,
+                        replace_char,
+                        overwrite,
+                    )
+                    for f in excel_files
+                ]
+
+                processed_files = 0
+                success_count = 0
+
+                # 使用进程池处理文件
+                with Pool(
+                    processes=self.process_pool_size
+                ) as pool:
+                    for (
+                        success,
+                        file_path,
+                    ) in pool.imap_unordered(
+                        self.replace_target_char_worker,
+                        process_args,
+                    ):
+                        if not self.processing:
+                            pool.terminate()
                             break
 
-                        if file.endswith(
-                            ".xlsx"
-                        ):  # 如果文件是Excel文件
-                            full_path = os.path.join(
-                                root, file
-                            )  # 获取文件的完整路径
-                            if self.replace_target_char(
-                                full_path,
-                                columns,
-                                rows,
-                                target_char,
-                                replace_char,
-                                overwrite,
-                            ):  # 调用clean_excel方法处理文件
-                                success_count += 1  # 如果处理成功，增加成功处理的文件数量
-                            processed_files += (
-                                1  # 增加已处理文件的数量
-                            )
-                            progress_callback(
-                                processed_files,
-                                total_files,
-                                file,
-                            )  # 调用进度回调函数
+                        if success:
+                            success_count += 1
+                        processed_files += 1
+                        progress_callback(
+                            processed_files,
+                            total_files,
+                            os.path.basename(file_path),
+                        )
+
                 complete_callback(
                     success_count, processed_files
-                )  # 调用完成回调函数
-            else:  # 如果没有选择文件夹
-                filename = os.path.basename(
-                    file_path
-                )  # 获取文件名
-                success = self.replace_target_char(
-                    file_path,
-                    columns,
-                    rows,
-                    target_char,
-                    replace_char,
-                    overwrite,
-                )  # 调用clean_excel方法处理文件
-                progress_callback(
-                    1, 1, filename
-                )  # 调用进度回调函数
-                complete_callback(
-                    1 if success else 0, 1
-                )  # 调用完成回调函数
+                )
+            else:
+                # 单文件处理
+                filename = os.path.basename(file_path)
+                success, _ = (
+                    self.replace_target_char_worker(
+                        (
+                            file_path,
+                            columns,
+                            rows,
+                            target_char,
+                            replace_char,
+                            overwrite,
+                        )
+                    )
+                )
+                progress_callback(1, 1, filename)
+                complete_callback(1 if success else 0, 1)
 
         except Exception as e:
-            print(
-                f"处理文件时出错: {str(e)}"
-            )  # 如果处理文件时出错，打印错误信息
-            complete_callback(
-                0, 1
-            )  # 调用完成回调函数，表示处理失败
+            print(f"处理文件时出错: {str(e)}")
+            complete_callback(0, 1)
         finally:
-            self.processing = False  # 设置处理标志为False
+            self.processing = False
 
     def execute_cleaning(
         self, values, progress_callback, complete_callback
     ):
-        """开始处理过程在一个单独的线程中"""
-        if self.processing:  # 检查是否已经在处理
-            return False  # 如果已经在处理，返回False
+        """在单独的线程中启动多进程处理"""
+        if self.processing:
+            return False
 
-        self.processing = True  # 设置处理标志为True
-        self.save_config(values)  # 保存配置
+        self.processing = True
+        self.save_config(values)
 
-        # 在新线程中开始处理
         self.current_thread = threading.Thread(
             target=self.process_files,
             args=(
@@ -293,17 +326,15 @@ class ExcelReplicerLogic:
                 complete_callback,
             ),
         )
-        self.current_thread.daemon = True  # 设置线程为守护线程，确保主程序退出时线程也会退出
-        self.current_thread.start()  # 启动线程
-        return True  # 返回成功标志
+        self.current_thread.daemon = True
+        self.current_thread.start()
+        return True
 
     def stop_processing(self):
         """停止当前的处理过程"""
-        self.processing = False  # 设置处理标志为False
+        self.processing = False
         if (
             self.current_thread
             and self.current_thread.is_alive()
-        ):  # 检查当前线程是否仍然活着
-            self.current_thread.join(
-                timeout=1.0
-            )  # 等待线程完成或超时
+        ):
+            self.current_thread.join(timeout=1.0)
