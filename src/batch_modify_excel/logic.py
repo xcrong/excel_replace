@@ -2,13 +2,15 @@ import os
 import json
 import threading
 from tkinter import messagebox
+from multiprocessing import Pool, cpu_count
+
 from openpyxl import load_workbook
 from openpyxl.utils import (
     get_column_letter,
     column_index_from_string,
 )
-from batch_modify_excel.config import Config
-from multiprocessing import Pool, cpu_count
+
+from batch_modify_excel.config import Config, logger
 
 
 class ExcelReplicerLogic:
@@ -22,9 +24,7 @@ class ExcelReplicerLogic:
     def load_config(self):
         """从文件中加载配置"""
         if os.path.exists(self.config_file):
-            with open(
-                self.config_file, "r", encoding="utf-8"
-            ) as f:
+            with open(self.config_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         return {}
 
@@ -32,9 +32,7 @@ class ExcelReplicerLogic:
         """将配置保存到文件中"""
         try:
             self.config.update(values)
-            with open(
-                self.config_file, "w", encoding="utf-8"
-            ) as f:
+            with open(self.config_file, "w", encoding="utf-8") as f:
                 json.dump(
                     self.config,
                     f,
@@ -42,7 +40,7 @@ class ExcelReplicerLogic:
                     indent=4,
                 )
         except Exception as e:
-            print(Config.CONFIG_SAVE_ERROR.format(str(e)))
+            logger.info(Config.CONFIG_SAVE_ERROR.format(str(e)))
 
     def parse_input(self, input_str, is_row=False):
         """将输入字符串解析为列表"""
@@ -51,10 +49,7 @@ class ExcelReplicerLogic:
 
         for sep in Config.SEPARATORS:
             if sep in input_str:
-                items = [
-                    item.strip()
-                    for item in input_str.split(sep)
-                ]
+                items = [item.strip() for item in input_str.split(sep)]
                 if is_row:
                     try:
                         return [int(item) for item in items]
@@ -81,20 +76,14 @@ class ExcelReplicerLogic:
             return None
 
     @staticmethod
-    def process_cell_value(
-        cell_value, target_char, replace_char
-    ):
+    def process_cell_value(cell_value, target_char, replace_char):
         """处理单元格值"""
         if cell_value is None:
             return None
-        return str(cell_value).replace(
-            target_char, replace_char
-        )
+        return str(cell_value).replace(target_char, replace_char)
 
     @staticmethod
-    def process_sheet(
-        sheet, columns, rows, target_char, replace_char
-    ):
+    def process_sheet(sheet, columns, rows, target_char, replace_char):
         """处理单个工作表"""
         # 获取该工作表的实际维度
         max_row = sheet.max_row
@@ -102,26 +91,19 @@ class ExcelReplicerLogic:
 
         # 处理指定列
         if columns:
+            logger.info(f"指定列{columns}")
             valid_columns = []
             for col in columns:
-                valid_col = (
-                    ExcelReplicerLogic.validate_column(col)
-                )
+                valid_col = ExcelReplicerLogic.validate_column(col)
                 if valid_col:
-                    col_idx = column_index_from_string(
-                        valid_col
-                    )
-                    if (
-                        col_idx <= max_column
-                    ):  # 确保列在工作表范围内
+                    col_idx = column_index_from_string(valid_col)
+                    if col_idx <= max_column:  # 确保列在工作表范围内
                         valid_columns.append(valid_col)
 
             for col in valid_columns:
                 for row in range(1, max_row + 1):
                     cell = sheet[f"{col}{row}"]
-                    if cell.value and target_char in str(
-                        cell.value
-                    ):
+                    if cell.value and target_char in str(cell.value):
                         cell.value = ExcelReplicerLogic.process_cell_value(
                             cell.value,
                             target_char,
@@ -130,16 +112,13 @@ class ExcelReplicerLogic:
 
         # 处理指定行
         if rows:
-            valid_rows = [
-                r for r in rows if 1 <= r <= max_row
-            ]
+            logger.info(f"指定行{rows}")
+            valid_rows = [r for r in rows if 1 <= r <= max_row]
             for row in valid_rows:
                 for col_idx in range(1, max_column + 1):
                     col_letter = get_column_letter(col_idx)
                     cell = sheet[f"{col_letter}{row}"]
-                    if cell.value and target_char in str(
-                        cell.value
-                    ):
+                    if cell.value and target_char in str(cell.value):
                         cell.value = ExcelReplicerLogic.process_cell_value(
                             cell.value,
                             target_char,
@@ -148,13 +127,12 @@ class ExcelReplicerLogic:
 
         # 如果没有指定行和列，处理所有单元格
         if not columns and not rows:
+            logger.info("处理所有单元格")
             for row in range(1, max_row + 1):
                 for col_idx in range(1, max_column + 1):
                     col_letter = get_column_letter(col_idx)
                     cell = sheet[f"{col_letter}{row}"]
-                    if cell.value and target_char in str(
-                        cell.value
-                    ):
+                    if cell.value and target_char in str(cell.value):
                         cell.value = ExcelReplicerLogic.process_cell_value(
                             cell.value,
                             target_char,
@@ -181,7 +159,7 @@ class ExcelReplicerLogic:
             # 遍历每个工作表
             for sheet_name in wb.sheetnames:
                 sheet = wb[sheet_name]
-                print(f"处理工作表: {sheet_name}")
+                logger.info(f"处理工作表 {sheet_name}")
 
                 # 处理当前工作表
                 ExcelReplicerLogic.process_sheet(
@@ -204,17 +182,13 @@ class ExcelReplicerLogic:
 
             wb.save(save_path)
             wb.close()  # 确保关闭工作簿
-            print(
-                Config.FILE_SAVED_MESSAGE.format(save_path)
-            )
+            logger.info(Config.FILE_SAVED_MESSAGE.format(save_path))
             return True, file_path
         except Exception as e:
-            print(f"处理文件 {file_path} 时出错: {str(e)}")
+            logger.error(f"处理文件 {file_path} 时出错: {str(e)}")
             return False, file_path
 
-    def process_files(
-        self, values, progress_callback, complete_callback
-    ):
+    def process_files(self, values, progress_callback, complete_callback):
         """使用进程池处理文件"""
         file_path = values["last_file_path"]
         columns = self.parse_input(values["columns"])
@@ -229,11 +203,7 @@ class ExcelReplicerLogic:
                 excel_files = []
                 for root, _, files in os.walk(file_path):
                     excel_files.extend(
-                        [
-                            os.path.join(root, f)
-                            for f in files
-                            if f.endswith(".xlsx")
-                        ]
+                        [os.path.join(root, f) for f in files if f.endswith(".xlsx")]
                     )
 
                 total_files = len(excel_files)
@@ -258,9 +228,7 @@ class ExcelReplicerLogic:
                 success_count = 0
 
                 # 使用进程池处理文件
-                with Pool(
-                    processes=self.process_pool_size
-                ) as pool:
+                with Pool(processes=self.process_pool_size) as pool:
                     for (
                         success,
                         file_path,
@@ -281,36 +249,30 @@ class ExcelReplicerLogic:
                             os.path.basename(file_path),
                         )
 
-                complete_callback(
-                    success_count, processed_files
-                )
+                complete_callback(success_count, processed_files)
             else:
                 # 单文件处理
                 filename = os.path.basename(file_path)
-                success, _ = (
-                    self.replace_target_char_worker(
-                        (
-                            file_path,
-                            columns,
-                            rows,
-                            target_char,
-                            replace_char,
-                            overwrite,
-                        )
+                success, _ = self.replace_target_char_worker(
+                    (
+                        file_path,
+                        columns,
+                        rows,
+                        target_char,
+                        replace_char,
+                        overwrite,
                     )
                 )
                 progress_callback(1, 1, filename)
                 complete_callback(1 if success else 0, 1)
 
         except Exception as e:
-            print(f"处理文件时出错: {str(e)}")
+            logger.error(f"处理文件时出错: {str(e)}")
             complete_callback(0, 1)
         finally:
             self.processing = False
 
-    def execute_cleaning(
-        self, values, progress_callback, complete_callback
-    ):
+    def execute_cleaning(self, values, progress_callback, complete_callback):
         """在单独的线程中启动多进程处理"""
         if self.processing:
             return False
@@ -333,8 +295,5 @@ class ExcelReplicerLogic:
     def stop_processing(self):
         """停止当前的处理过程"""
         self.processing = False
-        if (
-            self.current_thread
-            and self.current_thread.is_alive()
-        ):
+        if self.current_thread and self.current_thread.is_alive():
             self.current_thread.join(timeout=1.0)

@@ -236,7 +236,7 @@ class ExcelCleanerUI:  # 定义ExcelCleanerUI类
         self, current, total, filename
     ):  # 更新进度的方法
         """Update progress label"""  # 更新进度标签
-        progress_text = f"{Config.PROGRESS_LABEL_TEXT} {current}/{total} - 正在处理: {filename}"  # 进度文本
+        progress_text = f"{Config.PROGRESS_LABEL_TEXT} {current}/{total} - 已经处理: {filename}"  # 进度文本
         self.progress_label.config(text=progress_text)  # type: ignore # 设置进度标签的文本
         self.root.update_idletasks()  # 更新根窗口的任务
 

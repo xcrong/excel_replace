@@ -12,3 +12,6 @@ wheels/
 # res
 demo/
 config.json
+
+# cache
+app.log

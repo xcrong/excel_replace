@@ -1,3 +1,25 @@
+import logging
+
+# 创建一个通用的日志对象
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# create a file handler which logs even debug messages
+fh = logging.FileHandler('app.log', encoding="utf-8")
+fh.setLevel(logging.DEBUG)
+# create a console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+# create a formatter and set the formatter for the handlers
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
+
+
+
 class Config:
     # 配置文件路径
     CONFIG_FILE = "config.json"
@@ -5,7 +27,7 @@ class Config:
     DEFAULT_target_char = "（ 免费）"
     DEFAULT_replace_char = ""
     # 分隔符列表
-    SEPARATORS = [",", "，", " ", "、", ", "]
+    SEPARATORS = [" "]
     # 项目信息
     PROJECT_INFO = """Excel 批量处理工具
 版本：0.1.0
